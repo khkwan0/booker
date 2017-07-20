@@ -1,6 +1,6 @@
 import React, { Component } from 'react';
 import * as RB from 'react-bootstrap';
-import logo from './logo.svg';
+import logo from './logo.png';
 import './App.css';
 import Config from './config.js';
 
@@ -772,7 +772,6 @@ class App extends Component {
       <div className="App">
         <div className="App-header">
           <img src={logo} className="App-logo" alt="logo" />
-          <h2>Welcome to React</h2>
         </div>
           <RB.Navbar>
           {this.state.user &&
