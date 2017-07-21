@@ -411,7 +411,7 @@ class VenueRegistration extends Component {
       )
       .then((result) => { return result.json() })
       .then((resultJson) => {
-        this.props.goHome();
+        this.props.goManage();
       })
       .catch((err) => {
         console.log(err);
@@ -620,6 +620,79 @@ class VenueRegistration extends Component {
   }
 }
 
+class VenueManage extends Component {
+  constructor() {
+    super();
+    this.state = {
+      venues: []
+    }
+    this.getVenues = this.getVenues.bind(this);
+    this.getVenues();
+  }
+
+  getVenues() {
+    fetch(Config.default.host + '/getvenues',
+      {
+        method: 'GET',
+        credentials: 'include'
+      }
+    )
+    .then((result) => { return result.json() })
+    .then((resultJson) => {
+      let res = resultJson;
+      this.setState({
+        venues: res.venues
+      });
+    })
+    .catch((err) => {
+      console.log(err);
+    });
+  }
+
+  render() {
+    return (
+      <div>
+        <RB.Grid>
+          <RB.Row>
+            <RB.Col md={2}></RB.Col>
+              <RB.Col md={8}>
+              <RB.Table responsive striped bordered condensed>
+                <thead>
+                  <tr>
+                    <th>Venue</th>
+                    <th>Status</th>
+                    <th>Register Date</th>
+                    <th>Location</th>
+                    <th>Capacity</th>
+                    <th>Contact</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {
+                    this.state.venues.map((venue) => {
+                      return (
+                        <tr key={venue._id}>
+                          <td>{venue.venueName}</td>
+                          <td>{venue.verified?<RB.Label bsStyle="success">Verified</RB.Label>:<RB.Label bsStyle="danger">Unconfirmed</RB.Label>}</td>
+                          <td>{venue.ts}</td>
+                          <td>{venue.address}<br />{venue.address2}<br />{venue.zip}</td>
+                          <td>{venue.cap}</td>
+                          <td>Email: {venue.email}<br />Phone: {venue.phone}</td>
+                        </tr>
+                      )
+                    })
+                  }
+                </tbody>
+              </RB.Table>
+            </RB.Col>
+            <RB.Col md={2}></RB.Col>
+          </RB.Row>
+        </RB.Grid>
+      </div>
+    )
+  }
+}
+
 class Registration extends Component {
   constructor() {
     super();
@@ -631,6 +704,7 @@ class Registration extends Component {
     this.handleVenue = this.handleVenue.bind(this);
     this.handleArtist = this.handleArtist.bind(this);
     this.handleHome = this.handleHome.bind(this);
+    this.handleVenueManagement = this.handleVenueManagement.bind(this);
   }
 
   setView(view) {
@@ -653,6 +727,10 @@ class Registration extends Component {
 
   handleHome() {
     this.setView('init');
+  }
+
+  handleVenueManagement() {
+    this.setView('vmanage');
   }
 
   render() {
@@ -684,7 +762,7 @@ class Registration extends Component {
           }
           {this.state.view === 'venue' &&
             <div>
-              <VenueRegistration goHome={this.handleHome} handleUserLogin={this.props.handleUserLogin} handleUserRegister={this.props.handleUserRegister} user={this.props.user} setView={this.setView}/>
+              <VenueRegistration goManage={this.handleVenueManagement} handleUserLogin={this.props.handleUserLogin} handleUserRegister={this.props.handleUserRegister} user={this.props.user} setView={this.setView}/>
             </div>
           }
           {this.state.view === 'fan' &&
@@ -699,7 +777,12 @@ class Registration extends Component {
           }
           {this.state.view === 'login' &&
             <div>
-              Login
+              <UserLogin postLogin={this.props.handleUserLogin} />
+            </div>
+          }
+          {this.state.view === 'vmanage' &&
+            <div>
+              <VenueManage />
             </div>
           }
         </div>
