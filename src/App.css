@@ -23,7 +23,7 @@
 }
 
 .hiddenFileDialog {
-visibility: hidden;
+  visibility: hidden;
 }
 
 .overlay {
@@ -43,6 +43,10 @@ visibility: hidden;
 
 th {
   text-align:center;
+}
+
+.link {
+  font-weight:bold;
 }
 
 @keyframes App-logo-spin {

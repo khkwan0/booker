@@ -85,7 +85,7 @@ class UserLogin extends Component {
                 <h3>Password</h3>
                 <RB.FormControl type="password" placeholder="password..." onChange={this.changePassword} value={this.state.pw} />
                 <div>
-                  <h3><RB.Label className="clickable" onClick={this.handleCancel} bsStyle="danger">Cancel</RB.Label></h3>
+                  <h3><RB.Label className="clickable" onClick={this.handleCancel} bsStyle="warning">Cancel</RB.Label></h3>
                 </div>
                 <div>
                   <h3><RB.Label className="clickable" onClick={this.handleLogin} bsStyle="primary">Login</RB.Label></h3>
@@ -366,6 +366,19 @@ class VenueRegistration extends Component {
     this.checkComplete = this.checkComplete.bind(this);
   }
 
+  componentWillReceiveProps(nextProps) {
+    if (nextProps.userStatusClick === 'login') {
+      this.setState({
+        userLogin: true
+      })
+    }
+    if (nextProps.userStatusClick === 'register') {
+      this.setState({
+        userRegister: true
+      })
+    }
+  }
+
   checkComplete() {
     if (this.state.venueName &&
         this.state.address &&
@@ -383,6 +396,7 @@ class VenueRegistration extends Component {
       });
     }
   }
+
   saveVenue() {
     if (!this.state.incomplete) {
       let toSave = {
@@ -411,6 +425,7 @@ class VenueRegistration extends Component {
       )
       .then((result) => { return result.json() })
       .then((resultJson) => {
+        this.props.updateUser('hasVenue', true);
         this.props.goManage();
       })
       .catch((err) => {
@@ -534,12 +549,12 @@ class VenueRegistration extends Component {
       <div>
         {this.state.userRegister &&
           <div>
-            <UserRegister postRegister={this.postRegister} />
+            {this.props.showRegister(this.postRegister)}
           </div>
         }
         {this.state.userLogin &&
           <div>
-            <UserLogin postLogin={this.postLogin} />
+            {this.props.showLogin(this.postLogin)}
           </div>
         }
         {!this.state.userRegister && !this.state.userLogin &&
@@ -693,11 +708,12 @@ class VenueManage extends Component {
   }
 }
 
-class Registration extends Component {
-  constructor() {
-    super();
+class Main extends Component {
+  constructor(props) {
+    super(props);
     this.state = {
-      view: 'init'
+      view: this.props.view,
+      userStatusClick: ''
     };
     this.setView = this.setView.bind(this);
     this.handleFan = this.handleFan.bind(this);
@@ -705,6 +721,13 @@ class Registration extends Component {
     this.handleArtist = this.handleArtist.bind(this);
     this.handleHome = this.handleHome.bind(this);
     this.handleVenueManagement = this.handleVenueManagement.bind(this);
+    this.showLogin = this.showLogin.bind(this);
+  }
+
+  componentWillReceiveProps(nextProps) {
+    this.setState({
+      userStatusClick: nextProps.userStatusClick
+    })
   }
 
   setView(view) {
@@ -733,10 +756,32 @@ class Registration extends Component {
     this.setView('vmanage');
   }
 
+  showLogin(props) {
+    return (
+      <UserLogin postLogin={props} />
+    )
+  }
+
+  showRegister(props) {
+    return(
+      <UserRegister postRegister={props} />
+    )
+  }
+
   render() {
     return (
         <div>
-          {this.state.view === 'init' &&
+          {this.state.view === 'init' && this.state.userStatusClick === 'login' &&
+            <div>
+              <UserLogin postLogin={this.props.handleUserLogin} />
+            </div>
+          }
+          {this.state.view === 'init' && this.state.userStatusClick === 'register' && 
+            <div>
+              <UserRegister postRegister={this.props.handleUserRegister} />
+            </div>
+          }
+          {this.state.view === 'init' &&  !this.state.userStatusClick &&
             <div>
               <div>
                 <h2>I am a...</h2>
@@ -762,7 +807,16 @@ class Registration extends Component {
           }
           {this.state.view === 'venue' &&
             <div>
-              <VenueRegistration goManage={this.handleVenueManagement} handleUserLogin={this.props.handleUserLogin} handleUserRegister={this.props.handleUserRegister} user={this.props.user} setView={this.setView}/>
+              <VenueRegistration 
+                userStatusClick={this.state.userStatusClick}
+                showLogin={this.showLogin}
+                showRegister={this.showRegister}
+                goManage={this.handleVenueManagement}
+                handleUserLogin={this.props.handleUserLogin}
+                handleUserRegister={this.props.handleUserRegister}
+                user={this.props.user}
+                updateUser={this.props.updateUser}
+              />
             </div>
           }
           {this.state.view === 'fan' &&
@@ -775,11 +829,6 @@ class Registration extends Component {
               Artist
             </div>
           }
-          {this.state.view === 'login' &&
-            <div>
-              <UserLogin postLogin={this.props.handleUserLogin} />
-            </div>
-          }
           {this.state.view === 'vmanage' &&
             <div>
               <VenueManage />
@@ -790,18 +839,52 @@ class Registration extends Component {
   }
 }
 
+class UserStatus extends Component {
+  render() {
+    return (
+      <span>
+        {this.props.user &&
+        <span>
+          {this.props.user.hasVenue &&
+            <RB.Nav bsStyle="pills" pullLeft={true}>
+              <RB.NavItem className="link" eventKey={1} title="Venues">Your Venues</RB.NavItem>
+            </RB.Nav>
+          }
+          <RB.Nav pullRight={true}>
+            <RB.NavItem disabled>Logged in as:</RB.NavItem>
+            <RB.NavItem className="link" eventKey={2} title={this.props.user.email}>{this.props.user.email}</RB.NavItem>
+            <RB.NavItem eventKey={3} title="Logout"><RB.Label className="clickable" bsStyle="primary" onClick={this.props.handleLogout}>Logout</RB.Label></RB.NavItem>
+          </RB.Nav>
+          </span>
+        }
+        {!this.props.user &&
+          <RB.Nav pullRight={true}>
+            <RB.NavItem><RB.Label className="clickable" bsStyle="primary" onClick={this.props.handleLoginClick}>Login</RB.Label></RB.NavItem>
+            <RB.NavItem><RB.Label className="clickable" bsStyle="primary" onClick={this.props.handleUserRegisterClick}>Sign Up</RB.Label></RB.NavItem>
+          </RB.Nav>
+        }
+      </span>
+    )
+  }
+}
+
 class App extends Component {
   constructor() {
     super();
     this.state = {
-      user:null
+      user:null,
+      view: 'init',
+      userStatusCLick: ''
     }
     this.handleUserRegister = this.handleUserRegister.bind(this);
     this.handleUserLogin = this.handleUserLogin.bind(this);
     this.handleLogout = this.handleLogout.bind(this);
+    this.handleLoginClick = this.handleLoginClick.bind(this);
+    this.handleUserRegisterClick = this.handleUserRegisterClick.bind(this);
+    this.updateUser = this.updateUser.bind(this);
   }
 
-  componentDidMount() {
+  componentWillMount() {
     fetch(Config.default.host+'/checksession',
       {
         method: 'GET',
@@ -823,13 +906,15 @@ class App extends Component {
 
   handleUserRegister(user) {
     this.setState({
-      user: user
+      user: user,
+      userStatusClick: ''
     });
   }
 
   handleUserLogin(user) {
     this.setState({
-      user: user
+      user: user,
+      userStatusClick: ''
     });
   }
 
@@ -850,21 +935,41 @@ class App extends Component {
     });
   }
 
+  handleLoginClick() {
+    this.setState({
+      userStatusClick: 'login'
+    });
+  }
+
+  handleUserRegisterClick() {
+    this.setState({
+      userStatusClick: 'register'
+    });
+  }
+
+  updateUser(key, value) {
+    let user = this.state.user;
+    user[key] = value;
+    this.setState({user: user});
+  }
+
   render() {
     return (
       <div className="App">
         <div className="App-header">
           <img src={logo} className="App-logo" alt="logo" />
         </div>
-          <RB.Navbar>
-          {this.state.user &&
-            <RB.Nav pullRight={true}>
-              <RB.NavItem>Logged in as: {this.state.user.email}</RB.NavItem>
-              <RB.NavItem><RB.Label className="clickable" bsStyle="primary" onClick={this.handleLogout}>Logout</RB.Label></RB.NavItem>
-            </RB.Nav>
-          }
-          </RB.Navbar>
-        <Registration handleUserLogin={this.handleUserLogin} handleUserRegister={this.handleUserRegister} user={this.state.user} />
+        <RB.Navbar>
+          <UserStatus user={this.state.user} handleVenueClick={this.handleVenueClick} handleLoginClick={this.handleLoginClick} handleUserRegisterClick={this.handleUserRegisterClick} handleLogout={this.handleLogout} />
+        </RB.Navbar>
+        <Main
+          handleUserLogin={this.handleUserLogin}
+          handleUserRegister={this.handleUserRegister}
+          user={this.state.user}
+          userStatusClick={this.state.userStatusClick}
+          view={this.state.view}
+          updateUser={this.updateUser}
+        />
       </div>
     );
   }
