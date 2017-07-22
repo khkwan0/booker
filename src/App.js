@@ -26,13 +26,15 @@ class UserLogin extends Component {
 
   changeEmail(e) {
     this.setState({
-      email: e.target.value
+      email: e.target.value,
+      forgot: false
     });
   }
 
   changePassword(e) {
     this.setState({
-      pw: e.target.value
+      pw: e.target.value,
+      forgot: false
     });
   }
 
@@ -713,7 +715,7 @@ class Main extends Component {
     super(props);
     this.state = {
       view: this.props.view,
-      userStatusClick: ''
+      userStatusClick: ''  // should only be either '', 'login', or 'register', this indicated that login or register was cllick in the navbar'
     };
     this.setView = this.setView.bind(this);
     this.handleFan = this.handleFan.bind(this);
@@ -725,13 +727,34 @@ class Main extends Component {
   }
 
   componentWillReceiveProps(nextProps) {
-    this.setState({
-      userStatusClick: nextProps.userStatusClick
-    })
+    // handle click on naav/status bar if login or register....
+    // why like this?  because we want to be able to have <UserLogin /> and <UserRegister /> to be children of children, not just the child of <Main />
+    if (nextProps.userStatusClick === 'login' || nextProps.userStatusClick === 'register') {
+      this.setState({
+        userStatusClick: nextProps.userStatusClick
+      })
+    } else { // handle all otherclicks on nav/status bar
+      if (!nextProps.userStatusClick) {
+        this.setState({
+          userStatusClick: null
+        })
+      }
+      if (nextProps.userStatusClick === 'logout' || nextProps.userStatusClick === 'home') {
+        this.setState({
+          userStatusClick: null,
+          view: 'init'
+        })
+      }
+      if (nextProps.userStatusClick === 'vmanage') {
+        let view = 'vmanage';
+        this.setView(view);
+      }
+    }
   }
 
   setView(view) {
     this.setState({
+      userStatusClick: '',
       view: view
     })
   }
@@ -843,17 +866,29 @@ class UserStatus extends Component {
   render() {
     return (
       <span>
-        {this.props.user &&
-        <span>
-          {this.props.user.hasVenue &&
             <RB.Nav bsStyle="pills" pullLeft={true}>
-              <RB.NavItem className="link" eventKey={1} title="Venues">Your Venues</RB.NavItem>
-            </RB.Nav>
+              <RB.NavItem onClick={this.props.handleHomeClick} title="Home"><RB.Label bsStyle="primary" className="clickable">Home</RB.Label></RB.NavItem>
+          {this.props.user && this.props.user.hasVenue &&
+              <RB.NavItem onClick={this.props.handleVenueClick} className="link" eventKey={1} title="Venues">Your Venues</RB.NavItem>
           }
+            </RB.Nav>
+        {this.props.user &&
+          <span>
           <RB.Nav pullRight={true}>
             <RB.NavItem disabled>Logged in as:</RB.NavItem>
-            <RB.NavItem className="link" eventKey={2} title={this.props.user.email}>{this.props.user.email}</RB.NavItem>
-            <RB.NavItem eventKey={3} title="Logout"><RB.Label className="clickable" bsStyle="primary" onClick={this.props.handleLogout}>Logout</RB.Label></RB.NavItem>
+            <RB.NavItem
+              className="link"
+              eventKey={2}
+              title={this.props.user.email}
+            >
+              {this.props.user.email}
+            </RB.NavItem>
+            <RB.NavItem
+              eventKey={3}
+              title="Logout"
+            >
+              <RB.Label className="clickable" bsStyle="primary" onClick={this.props.handleLogout}>Logout</RB.Label>
+            </RB.NavItem>
           </RB.Nav>
           </span>
         }
@@ -881,6 +916,8 @@ class App extends Component {
     this.handleLogout = this.handleLogout.bind(this);
     this.handleLoginClick = this.handleLoginClick.bind(this);
     this.handleUserRegisterClick = this.handleUserRegisterClick.bind(this);
+    this.handleVenueClick = this.handleVenueClick.bind(this);
+    this.handleHomeClick = this.handleHomeClick.bind(this);
     this.updateUser = this.updateUser.bind(this);
   }
 
@@ -907,14 +944,14 @@ class App extends Component {
   handleUserRegister(user) {
     this.setState({
       user: user,
-      userStatusClick: ''
+      userStatusClick: null
     });
   }
 
   handleUserLogin(user) {
     this.setState({
       user: user,
-      userStatusClick: ''
+      userStatusClick: null
     });
   }
 
@@ -927,7 +964,8 @@ class App extends Component {
     )
     .then((result) => {
       this.setState({
-        user: null
+        user: null,
+        userStatusClick: 'logout'
       });
     })
     .catch((err) => {
@@ -947,6 +985,18 @@ class App extends Component {
     });
   }
 
+  handleVenueClick() {
+    this.setState({
+      userStatusClick: 'vmanage'
+    });
+  }
+
+  handleHomeClick() {
+    this.setState({
+      userStatusClick: 'home'
+    });
+  }
+
   updateUser(key, value) {
     let user = this.state.user;
     user[key] = value;
@@ -960,7 +1010,14 @@ class App extends Component {
           <img src={logo} className="App-logo" alt="logo" />
         </div>
         <RB.Navbar>
-          <UserStatus user={this.state.user} handleVenueClick={this.handleVenueClick} handleLoginClick={this.handleLoginClick} handleUserRegisterClick={this.handleUserRegisterClick} handleLogout={this.handleLogout} />
+          <UserStatus
+            user={this.state.user}
+            handleVenueClick={this.handleVenueClick}
+            handleLoginClick={this.handleLoginClick}
+            handleUserRegisterClick={this.handleUserRegisterClick}
+            handleLogout={this.handleLogout}
+            handleHomeClick={this.handleHomeClick}
+          />
         </RB.Navbar>
         <Main
           handleUserLogin={this.handleUserLogin}
