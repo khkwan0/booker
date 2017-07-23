@@ -1,8 +1,10 @@
 import React, { Component } from 'react';
 import * as RB from 'react-bootstrap';
+import { Calendar, CalendarControls } from 'react-yearly-calendar';
 import logo from './logo.png';
 import './App.css';
 import Config from './config.js';
+import moment from 'moment';
 
 class UserLogin extends Component {
   constructor() {
@@ -393,7 +395,27 @@ class ArtistRegistration extends Component {
       web_page: this.state.webPage,
       desc: this.state.desc
     };
+    fetch(Config.default.host + '/saveartist',
+      {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(toSave)
+      }
+    )
+    .then((result) => { return result.json() })
+    .then((resultJson) => {
+      this.props.updateUser('hasArtist', true);
+      this.props.goManage();
+    })
+    .catch((err) => {
+      console.log(err);
+    });
   }
+
   showFullImage() {
     if (this.state.image) {
       this.setState({
@@ -875,13 +897,286 @@ class VenueRegistration extends Component {
   }
 }
 
+class MyCalendar extends Component {
+  constructor(props) {
+    super(props);
+    let today = moment();
+    let yesterday = moment().subtract(1, 'days');
+    var customClass = {
+      past: day => day.isBefore(yesterday),
+      blackout: this.props.dates.blackout,
+      available: this.props.dates.available
+    }
+    this.state = {
+      year: today.year(),
+      selectedDay: today,
+      toSet: 'available',
+      refId: this.props.refId,
+      customClass:customClass
+    }
+		this.onPrevYear = this.onPrevYear.bind(this);
+		this.onNextYear = this.onNextYear.bind(this);
+		this.onDatePicked = this.onDatePicked.bind(this);
+    this.onChangeToSet = this.onChangeToSet.bind(this);
+    this.saveAvail = this.saveAvail.bind(this);
+  }
+
+  saveAvail() {
+    if (this.state.refId) {
+      fetch(Config.default.host + '/saveavail',
+        {
+          method: 'POST',
+          credentials: 'include',
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            refid: this.state.refId,
+            blackout: this.state.customClass.blackout,
+            avail: this.state.customClass.available
+          })
+        }
+      )
+      .then((result) => { return result.json() })
+      .then((resultJson) => {
+        if (typeof resultJson.ok === 'undefined') {
+          console.log(resultJson.msg);
+        }
+      })
+      .catch((err) => {
+        console.log(err);
+      });
+    } else {
+      console.log('NO REFID!');
+    }
+  }
+
+  onPrevYear() {
+    this.setState({ year: this.state.year-1 });
+  }
+
+  onNextYear() {
+    this.setState({ year: this.state.year+1 });
+  }
+
+  onDatePicked(date, classes) {
+    let today = moment();
+    if (date.isSameOrAfter(today, 'day')) {
+      let customClass = this.state.customClass;
+      if (this.state.toSet === 'blackout') {
+        let index = customClass.blackout.indexOf(date.format('YYYY-MM-DD'));
+        if (index >= 0) {
+          customClass.blackout.splice(index, 1);
+        } else {
+          let index = customClass.available.indexOf(date.format('YYYY-MM-DD'));
+          if (index < 0) {
+            customClass.blackout.push(date.format('YYYY-MM-DD'));
+          }
+        }
+      } else {
+        let index = customClass.available.indexOf(date.format('YYYY-MM-DD'));
+        if (index >= 0) {
+          customClass.available.splice(index, 1);
+        } else {
+          let index = customClass.blackout.indexOf(date.format('YYYY-MM-DD'));
+          if (index < 0) {
+            customClass.available.push(date.format('YYYY-MM-DD'));
+          }
+        }
+      }
+      this.saveAvail();
+      this.setState({
+        selectedDay: date,
+        customClass: customClass
+      })
+    }
+	}
+
+  onChangeToSet(e) {
+    this.setState({toSet: e.target.value});
+  }
+
+  render() {
+    return (
+      <div>
+				<CalendarControls
+					year={this.state.year}
+					onPrevYear={this.onPrevYear}
+					onNextYear={this.onNextYear}
+        />
+        <RB.FormGroup>
+          {this.state.toSet==="available" &&
+            <span>
+              <RB.Radio onChange={this.onChangeToSet} name="optGroup" value="available" inline checked>Available</RB.Radio>
+              <RB.Radio onChange={this.onChangeToSet} name="optGroup" value="blackout" inline>Blackout</RB.Radio>
+            </span>
+          }
+          {this.state.toSet==="blackout" &&
+            <span>
+              <RB.Radio onChange={this.onChangeToSet} name="optGroup" value="available" inline>Available</RB.Radio>
+              <RB.Radio onChange={this.onChangeToSet} name="optGroup" value="blackout" inline checked>Blackout</RB.Radio>
+            </span>
+          }
+        </RB.FormGroup>
+        <div>
+          Selected dates will be your&nbsp;
+          <span>
+          {this.state.toSet==='blackout' &&
+            <RB.Label bsStyle="warning">Blackout</RB.Label>
+          }
+          {this.state.toSet === 'available' &&
+            <RB.Label bsStyle="warning">Available</RB.Label>
+          }
+          </span> dates
+        </div>
+        <Calendar year={this.state.year} selectedDay={this.state.selectedDay} onPickDate={this.onDatePicked} customClasses={this.state.customClass} />
+      </div>
+    )
+  }
+}
+
+class CalendarButton extends Component {
+  constructor(props) {
+    super(props);
+    this.state = {
+      refId: this.props.refId
+    }
+    this.handleClick = this.handleClick.bind(this);
+  }
+
+  handleClick() {
+    this.props.handleClick(this.state.refId);
+  }
+
+  render() {
+    return(
+      <RB.Label bsStyle="primary" onClick={this.handleClick} className="clickable">Edit Availability</RB.Label>
+    )
+  }
+}
+
+class ArtistManage extends Component {
+  constructor()  {
+    super();
+    this.state = {
+      artists: [],
+      showCalendar: false,
+      availabilityId: 0,
+      dates: {}
+    }
+    this.getArtists = this.getArtists.bind(this);
+    this.getArtists();
+    this.editCalendar = this.editCalendar.bind(this);
+  }
+
+  getArtists() {
+    fetch(Config.default.host + '/getartists',
+      {
+        method: 'GET',
+        credentials: 'include'
+      }
+    )
+    .then((result) => { return result.json() })
+    .then((resultJson) => {
+      let res = resultJson;
+      this.setState({
+        artists: res.artists
+      });
+    })
+    .catch((err) => {
+      console.log(err);
+    });
+  }
+
+  editCalendar(availabilityId) {
+    fetch(Config.default.host + '/getavail?refid='+ availabilityId,
+      {
+        method: 'GET',
+        credentials: 'include'
+      }
+    )
+    .then((result) => { return result.json() })
+    .then((resultJson) => {
+      let newDates = {
+        blackout: resultJson.blackout,
+        available: resultJson.available
+      };
+      this.setState({
+        showCalendar:true,
+        dates: newDates,
+        availabilityId: availabilityId
+      });
+    })
+    .catch((err) => {
+      console.log(err);
+    });
+  }
+
+  render() {
+    return (
+      <div>
+        {this.state.artists.length &&
+          <div>
+            <RB.Grid>
+              <RB.Row>
+                <RB.Col md={2}></RB.Col>
+                <RB.Col md={8}>
+                  <RB.Table responsive striped bordered condensed>
+                    <thead>
+                      <tr>
+                        <th>Artist</th>
+                        <th>Contact</th>
+                        <th>Edit Availability</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {this.state.artists.map((artist) => {
+                        return (
+                          <tr key={artist._id.toString()}>
+                            <td>{artist.artist_name}</td>
+                            <td>Email: {artist.email}<br />Phone: {artist.phone}</td>
+                            <td><CalendarButton handleClick={this.editCalendar} refId={artist._id.toString()} /></td>
+                          </tr>
+                        )})
+                      }
+                    </tbody>
+                  </RB.Table>
+                </RB.Col>
+                <RB.Col md={2}></RB.Col>
+              </RB.Row>
+            </RB.Grid>
+            {this.state.showCalendar &&
+              <div>
+                <RB.Grid>
+                  <RB.Row>
+                    <RB.Col md={1}></RB.Col>
+                    <RB.Col md={10}>
+                      <MyCalendar dates={this.state.dates} refId={this.state.availabilityId} />
+                      </RB.Col>
+                    <RB.Col md={1}></RB.Col>
+                  </RB.Row>
+                </RB.Grid>
+              </div>
+            }
+          </div>
+        }
+      </div>
+    )
+  }
+}
+
 class VenueManage extends Component {
   constructor() {
     super();
     this.state = {
-      venues: []
+      venues: [],
+      dates: {},
+      showCalendar: false,
+      availabilityId: 0
     }
     this.getVenues = this.getVenues.bind(this);
+    this.editCalendar = this.editCalendar.bind(this);
     this.getVenues();
   }
 
@@ -897,6 +1192,30 @@ class VenueManage extends Component {
       let res = resultJson;
       this.setState({
         venues: res.venues
+      });
+    })
+    .catch((err) => {
+      console.log(err);
+    });
+  }
+
+  editCalendar(availabilityId) {
+    fetch(Config.default.host + '/getavail?refid='+ availabilityId,
+      {
+        method: 'GET',
+        credentials: 'include'
+      }
+    )
+    .then((result) => { return result.json() })
+    .then((resultJson) => {
+      let newDates = {
+        blackout: resultJson.blackout,
+        available: resultJson.available
+      };
+      this.setState({
+        showCalendar:true,
+        dates: newDates,
+        availabilityId: availabilityId
       });
     })
     .catch((err) => {
@@ -920,6 +1239,7 @@ class VenueManage extends Component {
                     <th>Location</th>
                     <th>Capacity</th>
                     <th>Contact</th>
+                    <th></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -933,6 +1253,7 @@ class VenueManage extends Component {
                           <td>{venue.address}<br />{venue.address2}<br />{venue.zip}</td>
                           <td>{venue.cap}</td>
                           <td>Email: {venue.email}<br />Phone: {venue.phone}</td>
+                          <td><CalendarButton handleClick={this.editCalendar} refId={venue._id.toString()} /></td>
                         </tr>
                       )
                     })
@@ -943,6 +1264,19 @@ class VenueManage extends Component {
             <RB.Col md={2}></RB.Col>
           </RB.Row>
         </RB.Grid>
+            {this.state.showCalendar &&
+              <div>
+                <RB.Grid>
+                  <RB.Row>
+                    <RB.Col md={1}></RB.Col>
+                    <RB.Col md={10}>
+                      <MyCalendar dates={this.state.dates} refId={this.state.availabilityId} />
+                      </RB.Col>
+                    <RB.Col md={1}></RB.Col>
+                  </RB.Row>
+                </RB.Grid>
+              </div>
+            }
       </div>
     )
   }
@@ -986,6 +1320,10 @@ class Main extends Component {
       }
       if (nextProps.userStatusClick === 'vmanage') {
         let view = 'vmanage';
+        this.setView(view);
+      }
+      if (nextProps.userStatusClick === 'amanage') {
+        let view = 'amanage';
         this.setView(view);
       }
     }
@@ -1096,7 +1434,7 @@ class Main extends Component {
                 userStatusClick={this.state.userStatusClick}
                 showLogin={this.showLogin}
                 showRegister={this.showRegister}
-                goManage={this.handleArtistsManagement}
+                goManage={this.handleArtistManagement}
                 handleUserLogin={this.props.handleUserLogin}
                 handleUserRegister={this.props.handleUserRegister}
                 user={this.props.user}
@@ -1111,7 +1449,7 @@ class Main extends Component {
           }
           {this.state.view === 'amanage' &&
             <div>
-              Artists Management
+              <ArtistManage />
             </div>
           }
         </div>
@@ -1126,7 +1464,10 @@ class UserStatus extends Component {
             <RB.Nav bsStyle="pills" pullLeft={true}>
               <RB.NavItem onClick={this.props.handleHomeClick} title="Home"><RB.Label bsStyle="primary" className="clickable">Home</RB.Label></RB.NavItem>
           {this.props.user && this.props.user.hasVenue &&
-              <RB.NavItem onClick={this.props.handleVenueClick} className="link" eventKey={1} title="Venues">Your Venues</RB.NavItem>
+            <RB.NavItem onClick={this.props.handleVenueClick} className="link" eventKey={1} title="Venues">Your Venues</RB.NavItem>
+          }
+          {this.props.user && this.props.user.hasArtist &&
+            <RB.NavItem onClick={this.props.handleArtistClick} className="link" eventKey={5} title="Artists">Your Artists</RB.NavItem>
           }
             </RB.Nav>
         {this.props.user &&
@@ -1174,6 +1515,7 @@ class App extends Component {
     this.handleLoginClick = this.handleLoginClick.bind(this);
     this.handleUserRegisterClick = this.handleUserRegisterClick.bind(this);
     this.handleVenueClick = this.handleVenueClick.bind(this);
+    this.handleArtistClick = this.handleArtistClick.bind(this);
     this.handleHomeClick = this.handleHomeClick.bind(this);
     this.updateUser = this.updateUser.bind(this);
   }
@@ -1248,6 +1590,12 @@ class App extends Component {
     });
   }
 
+  handleArtistClick() {
+    this.setState({
+      userStatusClick: 'amanage'
+    });
+  }
+
   handleHomeClick() {
     this.setState({
       userStatusClick: 'home'
@@ -1270,6 +1618,7 @@ class App extends Component {
           <UserStatus
             user={this.state.user}
             handleVenueClick={this.handleVenueClick}
+            handleArtistClick={this.handleArtistClick}
             handleLoginClick={this.handleLoginClick}
             handleUserRegisterClick={this.handleUserRegisterClick}
             handleLogout={this.handleLogout}
