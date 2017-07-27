@@ -22,3 +22,4 @@ yarn-error.log*
 *.swp
 package-lock.json
 src/logo.png
+.eslintrc.orig.json

@@ -1,6 +1,6 @@
 let config = {
   default: {
-    host: 'http://23.239.1.81:3002'
+    host: 'https://23.239.1.81:3001'
   }
 }
 

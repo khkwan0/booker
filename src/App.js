@@ -5,6 +5,7 @@ import logo from './logo.png';
 import './App.css';
 import Config from './config.js';
 import moment from 'moment';
+import fetch from 'isomorphic-fetch';
 
 class UserLogin extends Component {
   constructor() {
@@ -407,7 +408,7 @@ class ArtistRegistration extends Component {
       }
     )
     .then((result) => { return result.json() })
-    .then((resultJson) => {
+    .then(() => {
       this.props.updateUser('hasArtist', true);
       this.props.goManage();
     })
@@ -677,7 +678,7 @@ class VenueRegistration extends Component {
         }
       )
       .then((result) => { return result.json() })
-      .then((resultJson) => {
+      .then(() => {
         this.props.updateUser('hasVenue', true);
         this.props.goManage();
       })
@@ -960,7 +961,7 @@ class MyCalendar extends Component {
     this.setState({ year: this.state.year+1 });
   }
 
-  onDatePicked(date, classes) {
+  onDatePicked(date) {
     let today = moment();
     if (date.isSameOrAfter(today, 'day')) {
       let customClass = this.state.customClass;
@@ -1116,7 +1117,6 @@ class ArtistManage extends Component {
   render() {
     return (
       <div>
-        {this.state.artists.length &&
           <div>
             <RB.Grid>
               <RB.Row>
@@ -1160,7 +1160,47 @@ class ArtistManage extends Component {
               </div>
             }
           </div>
-        }
+      </div>
+    )
+  }
+}
+
+class FanManage extends Component {
+  constructor() {
+    super();
+    this.state = {
+      zip: '00000',
+      radius: 0
+    };
+    this.getFan = this.getFan.bind(this);
+    this.getFan();
+  }
+
+  getFan() {
+    fetch(Config.default.host + '/getfan',
+      {
+        method: 'GET',
+        credentials: 'include'
+      }
+    )
+    .then((result) => { return result.json() })
+    .then((resultJson) => {
+      let res = resultJson;
+      this.setState({
+        zip: res.zip,
+        radius: res.radius
+      });
+    })
+    .catch((err) => {
+      console.log(err);
+    });
+  }
+
+  render() {
+    return (
+      <div>
+        <div><h3>Origin: {this.state.zip}</h3></div>
+        <div><h3>Maximum travel distance (miles): {this.state.radius}</h3></div>
       </div>
     )
   }
@@ -1282,6 +1322,274 @@ class VenueManage extends Component {
   }
 }
 
+class FanRegistration extends Component {
+  constructor() {
+    super();
+    this.state = {
+      userRegister: false,
+      userLogin: false,
+      lat: 0,
+      lng: 0,
+      street: '',
+      unit: '',
+      prefix: '',
+      city: '',
+      state: '',
+      zip: '',
+      radius: 15,
+      guessedZip: null,
+      incomplete: true
+    };
+
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition((position) => {
+        /*
+        this.setState({
+          lat: 34.087792,
+          lon: -118.355764
+        });
+        */
+        this.setState({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude
+        });
+        this.reverseGeoLookup();
+      });
+    }
+    this.changePrefix = this.changePrefix.bind(this);
+    this.changeStreet = this.changeStreet.bind(this);
+    this.changeUnit = this.changeUnit.bind(this);
+    this.changeCity = this.changeCity.bind(this);
+    this.changeState = this.changeState.bind(this);
+    this.changeZip = this.changeZip.bind(this);
+    this.changeRadius = this.changeRadius.bind(this);
+    this.handleUserLoginClick = this.handleUserLoginClick.bind(this);
+    this.handleUserRegisterClick = this.handleUserRegisterClick.bind(this);
+    this.postRegister = this.postRegister.bind(this);
+    this.postLogin = this.postLogin.bind(this);
+    this.reverseGeoLookup = this.reverseGeoLookup.bind(this);
+    this.isComplete = this.isComplete.bind(this);
+    this.saveFan = this.saveFan.bind(this);
+  }
+
+  componentWillReceiveProps(nextProps) {
+    if (nextProps.userStatusClick === 'login') {
+      this.setState({
+        userLogin: true
+      })
+    }
+    if (nextProps.userStatusClick === 'register') {
+      this.setState({
+        userRegister: true
+      })
+    }
+  }
+
+  isComplete() {
+    if (this.state.zip.length>4) {
+      return true;
+    } else {
+      return false;
+    }
+  }
+
+  saveFan() {
+    let toSave = {
+      zip: this.state.zip,
+      radius: this.state.radius
+    };
+    fetch(Config.default.host + '/savefan',
+      {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(toSave)
+      }
+    )
+    .then((result) => { return result.json() })
+    .then((resultJson) => {
+      console.log(resultJson);
+      this.props.goManage();
+      this.props.updateUser('hasFan', true);
+    })
+    .catch((err) => {
+      console.log(err);
+    });
+  }
+
+  reverseGeoLookup() {
+    fetch(Config.default.host + '/rgl?lat=' + this.state.lat + '&lon=' + this.state.lng,
+      {
+        method: 'GET',
+        credentials: 'include'
+      }
+    )
+    .then((result) => { return result.json() })
+    .then((resultJson) => {
+      this.setState({guessedZip: resultJson.msg.zip, zip:resultJson.msg.zip, incomplete:false});
+    })
+    .catch((err) => {
+      console.log(err);
+    });
+
+  }
+
+  changeRadius(e) {
+    console.log(e.target.value);
+    this.setState({
+      radius: e.target.value
+    });
+  }
+
+  changePrefix(e) {
+    this.setState({prefix: e.target.value});
+  }
+
+  changeStreet(e) {
+    this.setState({street: e.target.value})
+  }
+
+  changeUnit(e) {
+    this.setState({unit: e.target.value});
+  }
+
+  changeCity(e) {
+    this.setState({city: e.target.value});
+  }
+
+  changeState(e) {
+    this.setState({state: e.target.value});
+  }
+
+  changeZip(e) {
+    this.setState({zip: e.target.value});
+  }
+
+  handleUserRegisterClick() {
+    this.setState({
+      userRegister: true
+    });
+  }
+
+  handleUserLoginClick() {
+    this.setState({
+      userLogin: true
+    });
+  }
+
+  postRegister(user) {
+    this.props.handleUserRegister(user);
+    this.setState({
+      userRegister: false
+    });
+  }
+
+  postLogin(user) {
+    this.props.handleUserLogin(user);
+    this.setState({
+      userLogin: false
+    });
+  }
+  render() {
+    return (
+      <div>
+        {this.state.userRegister &&
+          <div>
+            {this.props.showRegister(this.postRegister)}
+          </div>
+        }
+        {this.state.userLogin &&
+          <div>
+            {this.props.showLogin(this.postLogin)}
+          </div>
+        }
+        {!this.state.userRegister && !this.state.userLogin &&
+          <div>
+          <div>
+            <div>
+              <h2>Tell us about yourself</h2>
+            </div>
+            <div>
+              {!this.props.user && 
+                <div>
+                  Already registered?  <RB.Label onClick={this.handleUserLoginClick} bsStyle="primary" className="clickable">Login</RB.Label>
+                </div>
+              }
+              <RB.Grid>
+                <RB.Row>
+                  <RB.Col md={4}></RB.Col>
+                  <RB.Col md={4}>
+                    {this.state.guessedZip &&
+                      <div>
+                        <div><h3>We think you are in: {this.state.guessedZip}</h3></div>
+                        <div>
+                          A zip code allows us to determine the venues that are close to you.  Is {this.state.guessedZip} accurate enough?
+                          If not, please enter a different zip code:
+                          <RB.FormControl onChange={this.changeZip} value={this.state.zip} placeholder="Zip code" />
+                        </div>
+                      </div>
+                    }
+                    {!this.state.guessedZip &&
+                      <div>
+                        A zip code allows us to determine the venues that are close to you.  Please enter zip code:
+                        <RB.FormControl onChange={this.changeZip} value={this.state.zip} placeholder="Zip code" />
+                      </div>
+                    }
+                    <div>
+                      <h3>How far are you willing to travel from {this.state.zip} to see a show?</h3>
+                      <div style={{textAlign:'left'}}>
+                      <RB.FormGroup>
+                        <RB.Radio name="radiusGroup" onClick={this.changeRadius} value="2">Only within my neighborhood (Very restrictive)</RB.Radio>
+                        <RB.Radio name="radiusGroup" onClick={this.changeRadius} value="15" defaultChecked>Across town</RB.Radio>
+                        <RB.Radio name="radiusGroup" onClick={this.changeRadius} value="50">50 miles</RB.Radio>
+                        <RB.Radio name="radiusGroup" onClick={this.changeRadius} value="100">100 miles</RB.Radio>
+                        <RB.Radio name="radiusGroup" onClick={this.changeRadius} value="500">500 miles</RB.Radio>
+                        <RB.Radio name="radiusGroup" onClick={this.changeRadius} value="9999">Doesn&apos;t matter.  I will go anywhere</RB.Radio>
+                      </RB.FormGroup>
+                      </div>
+                    </div>
+                    {/*
+                    <RB.FormGroup>
+                      <RB.FormControl placeholder="906 N Doheny Dr." onChange={this.changeStreet} value={this.state.street} />
+                      <RB.FormControl placeholder="313 (Unit Number) --- optional" onChange={this.changeUnit} value={this.state.unit}  />
+                      <RB.FormControl placeholder="West Hollywood" onChange={this.changeCity} value={this.state.city} />
+                      <RB.FormControl placeholder="CA" onChange={this.changeState} value={this.state.state} />
+                      <RB.FormControl placeholder="90069 (required)" onChange={this.changeZip} value={this.state.zip} /> 
+                    </RB.FormGroup>
+                    */
+                    }
+                  </RB.Col>
+                  <RB.Col md={4}></RB.Col>
+                </RB.Row>
+              </RB.Grid>
+            </div>
+          </div>
+          <div>
+          {this.props.user && this.isComplete() &&
+            <div>
+              <h2><RB.Label className="clickable" bsStyle="primary" onClick={this.saveFan}>Save your preferences!</RB.Label></h2>
+            </div>
+          }
+          {!this.props.user &&
+            <div>
+              <div>You have to be a registered user in order to be a fan</div>
+              <div>You can <RB.Label className="clickable" onClick={this.handleUserRegisterClick}>Register here</RB.Label></div>
+              <div>OR</div>
+              <div>If you already registered, you can <RB.Label className="clickable" bsStyle="primary" onClick={this.handleUserLoginClick}>Login</RB.Label> here</div>
+            </div>
+          }
+          </div>
+          </div>
+        }
+      </div>
+    )
+  }
+}
+
+
 class Main extends Component {
   constructor(props) {
     super(props);
@@ -1296,6 +1604,7 @@ class Main extends Component {
     this.handleHome = this.handleHome.bind(this);
     this.handleVenueManagement = this.handleVenueManagement.bind(this);
     this.handleArtistManageMent = this.handleArtistManagement.bind(this);
+    this.handleFanManagement = this.handleFanManagement.bind(this);
     this.showLogin = this.showLogin.bind(this);
   }
 
@@ -1324,6 +1633,10 @@ class Main extends Component {
       }
       if (nextProps.userStatusClick === 'amanage') {
         let view = 'amanage';
+        this.setView(view);
+      }
+      if (nextProps.userStatusClick === 'fmanage') {
+        let view = 'fmanage';
         this.setView(view);
       }
     }
@@ -1358,6 +1671,10 @@ class Main extends Component {
 
   handleArtistManagement() {
     this.setView('amanage');
+  }
+
+  handleFanManagement() {
+    this.setView('fmanage');
   }
 
   showLogin(props) {
@@ -1425,7 +1742,16 @@ class Main extends Component {
           }
           {this.state.view === 'fan' &&
             <div>
-              Fan
+              <FanRegistration
+                userStatusClick={this.state.userStatusClick}
+                showLogin={this.showLogin}
+                showRegister={this.showRegister}
+                goManage={this.handleFanManagement}
+                handleUserLogin={this.props.handleUserLogin}
+                handleUserRegister={this.props.handleUserRegister}
+                user={this.props.user}
+                updateUser={this.props.updateUser}
+              />
             </div>
           }
           {this.state.view === 'artist' &&
@@ -1452,6 +1778,11 @@ class Main extends Component {
               <ArtistManage />
             </div>
           }
+          {this.state.view === 'fmanage' &&
+            <div>
+              <FanManage />
+            </div>
+          }
         </div>
     );
   }
@@ -1468,6 +1799,9 @@ class UserStatus extends Component {
           }
           {this.props.user && this.props.user.hasArtist &&
             <RB.NavItem onClick={this.props.handleArtistClick} className="link" eventKey={5} title="Artists">Your Artists</RB.NavItem>
+          }
+          {this.props.user && this.props.user.hasFan &&
+            <RB.NavItem onClick={this.props.handleFanClick} className="link" eventKey={5} title="Artists">FAN</RB.NavItem>
           }
             </RB.Nav>
         {this.props.user &&
@@ -1516,6 +1850,7 @@ class App extends Component {
     this.handleUserRegisterClick = this.handleUserRegisterClick.bind(this);
     this.handleVenueClick = this.handleVenueClick.bind(this);
     this.handleArtistClick = this.handleArtistClick.bind(this);
+    this.handleFanClick = this.handleFanClick.bind(this);
     this.handleHomeClick = this.handleHomeClick.bind(this);
     this.updateUser = this.updateUser.bind(this);
   }
@@ -1561,7 +1896,7 @@ class App extends Component {
         credentials: 'include'
       }
     )
-    .then((result) => {
+    .then(() => {
       this.setState({
         user: null,
         userStatusClick: 'logout'
@@ -1596,6 +1931,12 @@ class App extends Component {
     });
   }
 
+  handleFanClick() {
+    this.setState({
+      userStatusClick: 'fmanage'
+    })
+  }
+
   handleHomeClick() {
     this.setState({
       userStatusClick: 'home'
@@ -1619,6 +1960,7 @@ class App extends Component {
             user={this.state.user}
             handleVenueClick={this.handleVenueClick}
             handleArtistClick={this.handleArtistClick}
+            handleFanClick={this.handleFanClick}
             handleLoginClick={this.handleLoginClick}
             handleUserRegisterClick={this.handleUserRegisterClick}
             handleLogout={this.handleLogout}
