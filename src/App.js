@@ -2,10 +2,20 @@ import React, { Component } from 'react';
 import * as RB from 'react-bootstrap';
 import { Calendar, CalendarControls } from 'react-yearly-calendar';
 import logo from './logo.png';
+import spinner from './lp.png';
 import './App.css';
 import Config from './config.js';
 import moment from 'moment';
 import fetch from 'isomorphic-fetch';
+import parseAddress from 'parse-address';
+
+class Spinner extends Component {
+  render() {
+    return(
+      <img src={spinner} className="spinner" alt="spinner" />
+    )
+  }
+}
 
 class UserLogin extends Component {
   constructor() {
@@ -14,7 +24,8 @@ class UserLogin extends Component {
       email: '',
       pw: '',
       invalid: false,
-      forgot: false
+      forgot: false,
+      showSpinner: false
     }
     this.changeEmail = this.changeEmail.bind(this);
     this.changePassword = this.changePassword.bind(this);
@@ -43,6 +54,10 @@ class UserLogin extends Component {
 
   handleLogin() {
     if (this.state.email && this.state.pw) {
+      this.setState({
+        showSpinner: true
+      })
+
       fetch(Config.default.host+'/login',
         {
           method: 'POST',
@@ -60,7 +75,8 @@ class UserLogin extends Component {
           this.props.postLogin(resultJson.user);
         } else {
           this.setState({
-            invalid: true
+            invalid: true,
+            showSpinner: false
           });
         }
       })
@@ -93,7 +109,12 @@ class UserLogin extends Component {
                   <h3><RB.Label className="clickable" onClick={this.handleCancel} bsStyle="warning">Cancel</RB.Label></h3>
                 </div>
                 <div>
-                  <h3><RB.Label className="clickable" onClick={this.handleLogin} bsStyle="primary">Login</RB.Label></h3>
+                  {this.state.showSpinner &&
+                    <Spinner />
+                  }
+                  {!this.state.showSpinner && 
+                    <h3><RB.Label className="clickable" onClick={this.handleLogin} bsStyle="primary">Login</RB.Label></h3>
+                  }
                 </div>
                 {this.state.invalid &&
                   <div>
@@ -585,6 +606,11 @@ class VenueRegistration extends Component {
     this.state = {
       venueName: '',
       address: '',
+      parsed: {},
+      location: {
+        type: "Point",
+        coordinates: []
+      },
       address2: '',
       zip: '',
       cap: '',
@@ -656,6 +682,7 @@ class VenueRegistration extends Component {
       let toSave = {
         venueName: this.state.venueName,
         address: this.state.address,
+        parsed: this.state.parsed,
         address2: this.state.address2,
         zip: this.state.zip,
         cap: this.state.cap,
@@ -664,7 +691,8 @@ class VenueRegistration extends Component {
         orig: this.state.orig,
         desc: this.state.desc,
         phone: this.state.phone,
-        email: this.state.email
+        email: this.state.email,
+        location: this.state.location
       };
       fetch(Config.default.host + '/savevenue',
         {
@@ -699,9 +727,46 @@ class VenueRegistration extends Component {
     this.checkComplete();
   }
 
+  checkAddress(parsed) {
+    let street = parsed.street;
+    let number = parsed.number;
+    let zip = this.state.zip;
+    if (street && number && zip) {
+      fetch(Config.default.host + '/getlonglat?st=' + street + '&nm=' + number + '&zip=' + zip,
+        {
+          method: 'GET',
+          credentials: 'include'
+        }
+      )
+      .then((result) => { return result.json() })
+      .then((resultJson) => {
+        if (resultJson) {
+          let coords = [];
+          coords.push(resultJson.lng);
+          coords.push(resultJson.lat);
+          this.setState({
+            location: {
+              type: "Point",
+              coordinates: coords
+            }
+          });
+        }
+      })
+      .catch((err) => {
+        console.log(err);
+      });
+    }
+  }
+
   changeAddress(e) {
+    if (this.state.typingTimeout) {
+      clearTimeout(this.state.typingTimeout);
+    }
+    let parsed = parseAddress.parseLocation(e.target.value);
     this.setState({
-      address: e.target.value
+      address: e.target.value,
+      parsed: parsed,
+      typingTimeout: setTimeout(() => {this.checkAddress(parsed)}, 750)
     });
     this.checkComplete();
   }
@@ -714,8 +779,12 @@ class VenueRegistration extends Component {
   }
 
   changeZip(e) {
+    if (this.state.typingTimeout) {
+      clearTimeout(this.state.typingTimeout);
+    }
     this.setState({
-      zip: e.target.value
+      zip: e.target.value,
+      typingTimeout: setTimeout(() => {this.checkAddress(this.state.parsed)}, 750)
     });
     this.checkComplete();
   }
@@ -838,6 +907,9 @@ class VenueRegistration extends Component {
                 <RB.FormControl onChange={this.changeAddress} placeholder="Address" type="text" value={this.state.address} />
                 <RB.FormControl onChange={this.changeAddress2} placeholder="Address2 (optional)" type="text" value={this.state.address2} />
                 <RB.FormControl onChange={this.changeZip} placeholder="ZIP code" type="text" value={this.state.zip} />
+                {this.state.location.coordinates.length>0 &&
+                  <div><span>{this.state.location.coordinates[1]}</span>,<span>{this.state.location.coordinates[0]}</span></div>
+                }
                 <h3>What is the maximum capacity?</h3>
                 <RB.FormControl onChange={this.changeCap} placeholder="Capacity" type="text" value={this.state.cap} />
                 <br />
@@ -856,6 +928,9 @@ class VenueRegistration extends Component {
                 <RB.FormControl onChange={this.changeWebPage} placeholder="Web Page...(optional) "value={this.state.webPage} />
               </RB.FormGroup>
               <div>
+                <div>
+                  <h3><RB.Label className="clickable" bsStyle="warning" onClick={this.props.onCancel}>Cancel</RB.Label></h3>
+                </div>
                 {this.props.user && !this.state.incomplete &&
                   <div>
                     <h2><RB.Label className="clickable" bsStyle="primary" onClick={this.saveVenue}>Register the venue!</RB.Label></h2>
@@ -1165,15 +1240,83 @@ class ArtistManage extends Component {
   }
 }
 
+class ArtistInfo extends Component {
+  constructor(props) {
+    super(props);
+    this.state = {
+      idx: this.props.value
+    }
+    this.onClick = this.onClick.bind(this);
+  }
+
+  onClick() {
+    this.props.onArtistClick(this.state.idx);
+  }
+
+  render() {
+    return (
+      <span className="clickable" onClick={this.onClick}>{this.props.artist.name}</span>
+    )
+  }
+}
+
 class FanManage extends Component {
   constructor() {
     super();
     this.state = {
-      zip: '00000',
-      radius: 0
+      zip: '',
+      radius: 0,
+      venues: [],
+      artist: '',
+      found: [],
+      showArtist: false,
+      idx: -1
     };
     this.getFan = this.getFan.bind(this);
+    this.changeArtist = this.changeArtist.bind(this);
+    this.onArtistClick = this.onArtistClick.bind(this);
+    this.onArtistSearchClick = this.onArtistSearchClick.bind(this);
+    this.handleCancel = this.handleCancel.bind(this);
     this.getFan();
+  }
+
+  handleCancel() {
+    this.setState({
+      showArtist: false
+    })
+  }
+
+  changeArtist(e) {
+    this.setState({
+      artist: e.target.value
+    })
+  }
+
+  onArtistClick(idx) {
+    this.setState({
+      showArtist: true,
+      idx: idx
+    })
+  }
+
+  onArtistSearchClick() {
+    if (this.state.artist) {
+      fetch(Config.default.host + '/searchartists?artist=' + this.state.artist,
+        {
+          method:'GET',
+          credentials: 'include'
+        }
+      )
+      .then((result) => { return result.json(); })
+      .then((resultJson) => {
+        this.setState({
+          found: resultJson
+        })
+      })
+      .catch((err) => {
+        console.log(err);
+      });
+    }
   }
 
   getFan() {
@@ -1188,7 +1331,8 @@ class FanManage extends Component {
       let res = resultJson;
       this.setState({
         zip: res.zip,
-        radius: res.radius
+        radius: res.radius,
+        venues: res.venues
       });
     })
     .catch((err) => {
@@ -1199,8 +1343,87 @@ class FanManage extends Component {
   render() {
     return (
       <div>
-        <div><h3>Origin: {this.state.zip}</h3></div>
+        {this.state.showArtist && 
+          <div>
+          <RB.Row>
+            <RB.Col md={4}></RB.Col>
+              <RB.Col md={4}>
+                <div style={{textAlign:'left'}}>
+          {
+            Object.keys(this.state.found[this.state.idx]).map((key) => {
+                if (typeof this.state.found[this.state.idx][key] !== 'object') {
+                  return (
+                <div key={key}>
+                  <span>{key}: </span><span>{this.state.found[this.state.idx][key]}</span>
+                </div>
+                )
+                }
+            })
+          }
+                </div>
+              </RB.Col>
+            <RB.Col md={4}></RB.Col>
+          </RB.Row>
+          <div>
+            <RB.Label bsStyle="warning" className="clickable" onClick={this.handleCancel}>Cancel</RB.Label>
+          </div>
+          </div>
+        }
+        {!this.state.showArtist &&
+          <div>
+        <div><h3>Origin: {this.state.zip?<span>{this.state.zip}</span>:<Spinner />}</h3></div>
         <div><h3>Maximum travel distance (miles): {this.state.radius}</h3></div>
+        <div>
+          <RB.Grid>
+            <RB.Row>
+              <RB.Col md={4}></RB.Col>
+              <RB.Col md={4}>
+                <div>
+                  <RB.FormControl placeholder="Search for artist/band" onChange={this.changeArtist} value={this.state.artist} />
+                </div>
+                <div>
+                  <h2><RB.Label className="clickable" onClick={this.onArtistSearchClick} bsStyle="primary">Search</RB.Label></h2>
+                </div>
+                {this.state.found.length>0 &&
+                  this.state.found.map((artist, idx) => {
+                    return( 
+                      <div key={artist._id}>
+                        <ArtistInfo value={idx} onArtistClick={this.onArtistClick} artist={artist} />
+                      </div>
+                    )
+                  })
+                  
+                }
+              </RB.Col>
+              <RB.Col md={4}></RB.Col>
+            </RB.Row>
+          </RB.Grid>
+        </div>
+        <div>
+          <h3>Venues within your maximum travel distance:</h3>
+          <RB.Table>
+            <thead>
+              <tr>
+                <th>Venue</th><th>Location</th><th>Capacity</th>
+              </tr>
+            </thead>
+            <tbody>
+              {
+                this.state.venues.map((venue) => {
+                  return(
+                    <tr key={venue._id}>
+                      <td>{venue.venueName}</td>
+                      <td>{venue.address}<br />{venue.address2}<br />{venue.zip}</td>
+                      <td>{venue.cap}</td>
+                    </tr>
+                  )
+                })
+              }
+            </tbody>
+          </RB.Table>
+        </div>
+        </div>
+        }
       </div>
     )
   }
@@ -1213,10 +1436,13 @@ class VenueManage extends Component {
       venues: [],
       dates: {},
       showCalendar: false,
-      availabilityId: 0
+      availabilityId: 0,
+      newVenueView: false
     }
     this.getVenues = this.getVenues.bind(this);
     this.editCalendar = this.editCalendar.bind(this);
+    this.handleNewVenueClick = this.handleNewVenueClick.bind(this);
+    this.postVenueSave = this.postVenueSave.bind(this);
     this.getVenues();
   }
 
@@ -1263,9 +1489,34 @@ class VenueManage extends Component {
     });
   }
 
+  handleNewVenueClick() {
+    this.setState({
+      newVenueView: true
+    });
+  }
+
+  postVenueSave() {
+    this.setState({
+      newVenueView: false
+    });
+    this.getVenues();
+  }
+
   render() {
     return (
       <div>
+        <div>
+          <RB.Label onClick={this.handleNewVenueClick} className="clickable">Add another venue</RB.Label>
+        </div>
+        {this.state.newVenueView &&
+          <VenueRegistration
+            user={this.props.user}
+            goManage={this.postVenueSave}
+            onCancel={this.postVenueSave}
+            updateUser={()=>{}}
+          />
+        }
+        <br />
         <RB.Grid>
           <RB.Row>
             <RB.Col md={2}></RB.Col>
@@ -1276,8 +1527,6 @@ class VenueManage extends Component {
                     <th>Venue</th>
                     <th>Status</th>
                     <th>Register Date</th>
-                    <th>Location</th>
-                    <th>Capacity</th>
                     <th>Contact</th>
                     <th></th>
                   </tr>
@@ -1289,10 +1538,8 @@ class VenueManage extends Component {
                         <tr key={venue._id}>
                           <td>{venue.venueName}</td>
                           <td>{venue.verified?<RB.Label bsStyle="success">Verified</RB.Label>:<RB.Label bsStyle="danger">Unconfirmed</RB.Label>}</td>
-                          <td>{venue.ts}</td>
-                          <td>{venue.address}<br />{venue.address2}<br />{venue.zip}</td>
+                          <td>{moment(venue.ts).format('ddd, MMM Do YYYY')}</td>
                           <td>{venue.cap}</td>
-                          <td>Email: {venue.email}<br />Phone: {venue.phone}</td>
                           <td><CalendarButton handleClick={this.editCalendar} refId={venue._id.toString()} /></td>
                         </tr>
                       )
@@ -1770,12 +2017,12 @@ class Main extends Component {
           }
           {this.state.view === 'vmanage' &&
             <div>
-              <VenueManage />
+              <VenueManage user={this.props.user} />
             </div>
           }
           {this.state.view === 'amanage' &&
             <div>
-              <ArtistManage />
+              <ArtistManage user={this.props.user} />
             </div>
           }
           {this.state.view === 'fmanage' &&
@@ -1801,7 +2048,7 @@ class UserStatus extends Component {
             <RB.NavItem onClick={this.props.handleArtistClick} className="link" eventKey={5} title="Artists">Your Artists</RB.NavItem>
           }
           {this.props.user && this.props.user.hasFan &&
-            <RB.NavItem onClick={this.props.handleFanClick} className="link" eventKey={5} title="Artists">FAN</RB.NavItem>
+            <RB.NavItem onClick={this.props.handleFanClick} className="link" eventKey={5} title="Fan">FAN</RB.NavItem>
           }
             </RB.Nav>
         {this.props.user &&
