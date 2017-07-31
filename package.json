@@ -20,6 +20,9 @@
     "lint": "eslint ."
   },
   "devDependencies": {
-    "eslint-config-google": "^0.9.1"
+    "enzyme": "^2.9.1",
+    "eslint-config-google": "^0.9.1",
+    "jest": "^20.0.4",
+    "react-test-renderer": "^15.6.1"
   }
 }
