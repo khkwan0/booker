@@ -133,25 +133,44 @@ class UserLogin extends Component {
 }
 
 class UserRegister extends Component {
-constructor() {
-  super();
-  this.state = {
-    email: '',
-    pw1: '',
-    pw2: '',
-    badPassword: false,
-    tooShort: true ,
+  constructor() {
+    super();
+    this.state = {
+      uname: '',
+      email: '',
+      pw1: '',
+      pw2: '',
+      badPassword: false,
+      tooShort: true ,
       badEmail: true,
       dupEmail: false,
+      badUname: true,
+      dupName: false,
       typingTimeout: 0
-
     }
+    this.changeUsername = this.changeUsername.bind(this);
     this.changeEmail = this.changeEmail.bind(this);
     this.changePassword = this.changePassword.bind(this);
     this.changePasswordConfirm = this.changePasswordConfirm.bind(this);
     this.handleCancel = this.handleCancel.bind(this);
     this.handleSave = this.handleSave.bind(this);
     this.checkEmail = this.checkEmail.bind(this);
+  }
+
+  changeUsername(e) {
+    if (this.state.typingTimeout) {
+      clearTimeout(this.state.typingTimeout);
+    }
+    let uname = e.target.value;
+    let bad = true;
+    if (uname.length>3) {
+      bad = false;
+    }
+    this.setState({
+      uname: uname,
+      badUname: bad,
+      typingTimeout: setTimeout(() => {this.checkUname(uname)}, 750)
+    })
   }
 
   changeEmail(e) {
@@ -170,6 +189,32 @@ constructor() {
       badEmail: bad,
       typingTimeout: setTimeout(() => {this.checkEmail(email)}, 750)
     });
+  }
+
+  checkUname(uname) {
+    if (!this.state.badUname) {
+      fetch(Config.default.host+'/checkuname?uname='+uname,
+        {
+          method: 'GET',
+          credentials: 'include',
+        }
+      )
+      .then((result) => { return result.json() })
+      .then((resultJson) => {
+        if (!resultJson.ok) {
+          this.setState({
+            dupUname: true
+          });
+        } else {
+          this.setState({
+            dupUname: false
+          });
+        }
+      })
+      .catch((err) => {
+        console.log(err);
+      });
+    }
   }
 
   checkEmail(email) {
@@ -231,7 +276,7 @@ constructor() {
   }
 
   handleSave() {
-    if (!this.state.badPassword && !this.state.tooShort && !this.state.badEmail  && !this.state.dupEmail) {
+    if (!this.state.badPassword && !this.state.tooShort && !this.state.badEmail  && !this.state.dupEmail && !this.state.dupUname && !this.state.badUname) {
       fetch(Config.default.host+'/register',
         {
           method:'POST',
@@ -242,7 +287,8 @@ constructor() {
           },
           body: JSON.stringify({
               email: this.state.email,
-              pw: this.state.pw1
+              pw: this.state.pw1,
+              uname: this.state.uname
           }),
         }
       )
@@ -268,39 +314,50 @@ constructor() {
               <h2>Welcome!</h2>
               <h3>Please sign up to gain full access to our features</h3>
               <RB.FormGroup>
+                <h3>What is your desired user name?</h3>
+                <RB.FormControl placeholder="User name" value={this.state.uname} onChange={this.changeUsername} />
+                {this.state.dupUname &&
+                  <div>
+                    <RB.Label bsStyle="warning">{this.state.uname} already exists, please choose another.</RB.Label>
+                  </div>
+                }
+                {this.state.badUname &&
+                  <div>
+                    <RB.Label bsStyle="warning">Username must be more than 3 characters long</RB.Label>
+                  </div>
+                }
                 <h3>What is your email?</h3>
                 <RB.FormControl placeholder="email@someaddress.com (required)" type="email" value={this.state.email} onChange={this.changeEmail} />
+                {this.state.badEmail &&
+                  <div>
+                    <RB.Label bsStyle="warning">Invalid Email</RB.Label>
+                  </div>
+                 }
+                {this.state.dupEmail &&
+                  <div>
+                    <RB.Label bsStyle="warning">Email already exists</RB.Label>
+                  </div>
+                }
                 <h3>Choose a password</h3>
                 <RB.FormControl placeholder="password (required)" type="password" onChange={this.changePassword} value={this.state.pw1} />
                 <h3>Re-type your password</h3>
                 <RB.FormControl placeholder="password confirmation (required)" type="password" onChange={this.changePasswordConfirm} value={this.state.pw2} />
-
+                {this.state.badPassword &&
+                  <div>
+                    <RB.Label bsStyle="warning">Passwords do not match</RB.Label>
+                  </div>
+                }
+                {this.state.tooShort &&
+                  <div>
+                    <RB.Label bsStyle="warning">Password is too short</RB.Label>
+                  </div>
+                }
               </RB.FormGroup>
               <h2><RB.Label className="clickable" bsStyle="warning" onClick={this.handleCancel}>Cancel</RB.Label></h2>
               <h2><RB.Label className="clickable" bsStyle="primary" onClick={this.handleSave}>Save</RB.Label></h2>
             </RB.Col>
-            {this.state.badPassword &&
-              <div>
-                <RB.Label bsStyle="warning">Passwords do not match</RB.Label>
-              </div>
-            }
-            {this.state.tooShort &&
-              <div>
-                <RB.Label bsStyle="warning">Password is too short</RB.Label>
-              </div>
-            }
-            {this.state.badEmail &&
-              <div>
-                <RB.Label bsStyle="warning">Invalid Email</RB.Label>
-              </div>
-             }
             {!this.state.tooShort && !this.state.badPassword && !this.state.dupEmail &&
               <RB.Label bsStyle="success">OK</RB.Label>
-            }
-            {this.state.dupEmail &&
-              <div>
-                <RB.Label bsStyle="warning">Email already exists</RB.Label>
-              </div>
             }
             <RB.Col md={4}></RB.Col>
           </RB.Row>
@@ -309,6 +366,7 @@ constructor() {
     );
   }
 }
+
 class UploadImage extends Component {
   constructor() {
     super();
@@ -1261,8 +1319,8 @@ class ArtistInfo extends Component {
 }
 
 class FanManage extends Component {
-  constructor() {
-    super();
+  constructor(props) {
+    super(props);
     this.state = {
       zip: '',
       radius: 0,
@@ -1270,14 +1328,42 @@ class FanManage extends Component {
       artist: '',
       found: [],
       showArtist: false,
-      idx: -1
+      idx: -1,
+      wants: []
     };
-    this.getFan = this.getFan.bind(this);
+    this.getNearestVenues = this.getNearestVenues.bind(this);
     this.changeArtist = this.changeArtist.bind(this);
     this.onArtistClick = this.onArtistClick.bind(this);
     this.onArtistSearchClick = this.onArtistSearchClick.bind(this);
     this.handleCancel = this.handleCancel.bind(this);
-    this.getFan();
+    this.onWant = this.onWant.bind(this);
+    this.getNearestVenues();
+  }
+
+  onWant() {
+    let toSend = {
+      artist: this.state.found[this.state.idx]
+    };
+    fetch(Config.default.host + '/want',
+      {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(toSend)
+      }
+    )
+    .then((result) => { return result.json() })
+    .then((resultJson) => {
+      if (resultJson) {
+        this.setState.wants.push(this.props.user.uname);
+      }
+    })
+    .catch((err) => {
+      console.log(err);
+    });
   }
 
   handleCancel() {
@@ -1319,8 +1405,8 @@ class FanManage extends Component {
     }
   }
 
-  getFan() {
-    fetch(Config.default.host + '/getfan',
+  getNearestVenues() {
+    fetch(Config.default.host + '/getnearestvenues',
       {
         method: 'GET',
         credentials: 'include'
@@ -1328,11 +1414,10 @@ class FanManage extends Component {
     )
     .then((result) => { return result.json() })
     .then((resultJson) => {
-      let res = resultJson;
       this.setState({
-        zip: res.zip,
-        radius: res.radius,
-        venues: res.venues
+        zip: this.props.user.fan.zip,
+        radius: this.props.user.fan.radius,
+        venues: resultJson.venues
       });
     })
     .catch((err) => {
@@ -1345,28 +1430,33 @@ class FanManage extends Component {
       <div>
         {this.state.showArtist && 
           <div>
-          <RB.Row>
-            <RB.Col md={4}></RB.Col>
-              <RB.Col md={4}>
-                <div style={{textAlign:'left'}}>
-          {
-            Object.keys(this.state.found[this.state.idx]).map((key) => {
-                if (typeof this.state.found[this.state.idx][key] !== 'object') {
-                  return (
-                <div key={key}>
-                  <span>{key}: </span><span>{this.state.found[this.state.idx][key]}</span>
-                </div>
-                )
-                }
-            })
-          }
-                </div>
-              </RB.Col>
-            <RB.Col md={4}></RB.Col>
-          </RB.Row>
-          <div>
-            <RB.Label bsStyle="warning" className="clickable" onClick={this.handleCancel}>Cancel</RB.Label>
-          </div>
+            <RB.Row>
+              <RB.Col md={4}></RB.Col>
+                <RB.Col md={4}>
+                  <div style={{textAlign:'left'}}>
+                  {
+                    Object.keys(this.state.found[this.state.idx]).map((key) => {
+                        if (typeof this.state.found[this.state.idx][key] !== 'object') {
+                          return (
+                            <div key={key}>
+                              <span>{key}: </span><span>{this.state.found[this.state.idx][key]}</span>
+                            </div>
+                          )
+                        } else {
+                          return null;
+                        }
+                    })
+                  }
+                  </div>
+                </RB.Col>
+              <RB.Col md={4}></RB.Col>
+            </RB.Row>
+            <div>
+              <RB.Label bsStyle="success" className="clickable" onClick={this.onWant}>I want to see this Artist/Group/Band</RB.Label>
+            </div>
+            <div>
+              <RB.Label bsStyle="warning" className="clickable" onClick={this.handleCancel}>Cancel</RB.Label>
+            </div>
           </div>
         }
         {!this.state.showArtist &&
@@ -1527,7 +1617,7 @@ class VenueManage extends Component {
                     <th>Venue</th>
                     <th>Status</th>
                     <th>Register Date</th>
-                    <th>Contact</th>
+                    <th>Capacity</th>
                     <th></th>
                   </tr>
                 </thead>
@@ -1570,8 +1660,8 @@ class VenueManage extends Component {
 }
 
 class FanRegistration extends Component {
-  constructor() {
-    super();
+  constructor(props) {
+    super(props);
     this.state = {
       userRegister: false,
       userLogin: false,
@@ -1587,21 +1677,28 @@ class FanRegistration extends Component {
       guessedZip: null,
       incomplete: true
     };
-
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition((position) => {
-        /*
-        this.setState({
-          lat: 34.087792,
-          lon: -118.355764
+    if (typeof this.props.user.fan !== 'undefined') {
+      this.setState({
+        zip: this.props.user.fan.zip,
+        lng: this.props.user.fan.location[0],
+        lat: this.props.user.fan.location[1],
+        radius: this.props.user.fan.radius
+      })
+    } else {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition((position) => {
+          /*
+          this.setState({
+            lat: 34.087792,
+            lon: -118.355764
+          });
+          */
+          this.setState({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          });
         });
-        */
-        this.setState({
-          lat: position.coords.latitude,
-          lng: position.coords.longitude
-        });
-        this.reverseGeoLookup();
-      });
+      }
     }
     this.changePrefix = this.changePrefix.bind(this);
     this.changeStreet = this.changeStreet.bind(this);
@@ -1617,6 +1714,8 @@ class FanRegistration extends Component {
     this.reverseGeoLookup = this.reverseGeoLookup.bind(this);
     this.isComplete = this.isComplete.bind(this);
     this.saveFan = this.saveFan.bind(this);
+
+    this.reverseGeoLookup();
   }
 
   componentWillReceiveProps(nextProps) {
@@ -1661,6 +1760,7 @@ class FanRegistration extends Component {
       console.log(resultJson);
       this.props.goManage();
       this.props.updateUser('hasFan', true);
+      this.props.updateUser('fan', resultJson.res);
     })
     .catch((err) => {
       console.log(err);
@@ -2027,7 +2127,7 @@ class Main extends Component {
           }
           {this.state.view === 'fmanage' &&
             <div>
-              <FanManage />
+              <FanManage  user={this.props.user} />
             </div>
           }
         </div>
@@ -2039,8 +2139,8 @@ class UserStatus extends Component {
   render() {
     return (
       <span>
-            <RB.Nav bsStyle="pills" pullLeft={true}>
-              <RB.NavItem onClick={this.props.handleHomeClick} title="Home"><RB.Label bsStyle="primary" className="clickable">Home</RB.Label></RB.NavItem>
+        <RB.Nav bsStyle="pills" pullLeft={true}>
+          <RB.NavItem onClick={this.props.handleHomeClick} title="Home"><RB.Label bsStyle="primary" className="clickable">Home</RB.Label></RB.NavItem>
           {this.props.user && this.props.user.hasVenue &&
             <RB.NavItem onClick={this.props.handleVenueClick} className="link" eventKey={1} title="Venues">Your Venues</RB.NavItem>
           }
@@ -2050,25 +2150,25 @@ class UserStatus extends Component {
           {this.props.user && this.props.user.hasFan &&
             <RB.NavItem onClick={this.props.handleFanClick} className="link" eventKey={5} title="Fan">FAN</RB.NavItem>
           }
-            </RB.Nav>
+        </RB.Nav>
         {this.props.user &&
           <span>
-          <RB.Nav pullRight={true}>
-            <RB.NavItem disabled>Logged in as:</RB.NavItem>
-            <RB.NavItem
-              className="link"
-              eventKey={2}
-              title={this.props.user.email}
-            >
-              {this.props.user.email}
-            </RB.NavItem>
-            <RB.NavItem
-              eventKey={3}
-              title="Logout"
-            >
-              <RB.Label className="clickable" bsStyle="primary" onClick={this.props.handleLogout}>Logout</RB.Label>
-            </RB.NavItem>
-          </RB.Nav>
+            <RB.Nav pullRight={true}>
+              <RB.NavItem disabled>Logged in as:</RB.NavItem>
+              <RB.NavItem
+                className="link"
+                eventKey={2}
+                title={this.props.user.email}
+              >
+                {this.props.user.uname}
+              </RB.NavItem>
+              <RB.NavItem
+                eventKey={3}
+                title="Logout"
+              >
+                <RB.Label className="clickable" bsStyle="primary" onClick={this.props.handleLogout}>Logout</RB.Label>
+              </RB.NavItem>
+            </RB.Nav>
           </span>
         }
         {!this.props.user &&
