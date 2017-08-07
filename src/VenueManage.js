@@ -44,6 +44,9 @@ class VenueManage extends Component {
   }
 
   editCalendar(availabilityId) {
+    this.setState({
+      showCalendar: false
+    });
     fetch(Config.default.host + '/getavail?refid='+ availabilityId,
       {
         method: 'GET',
